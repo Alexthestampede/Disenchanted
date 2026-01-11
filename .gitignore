@@ -1,5 +1,8 @@
 # Disenchanted .gitignore
 
+# Dependencies (ModuLLe cloned during setup)
+deps/
+
 # Python
 __pycache__/
 *.py[cod]

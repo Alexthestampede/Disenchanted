@@ -5,7 +5,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="$SCRIPT_DIR/venv"
-MODULLE_LIB="$SCRIPT_DIR/../../deps/ModuLLe"
+DEPS_DIR="$SCRIPT_DIR/deps"
+MODULLE_LIB="$DEPS_DIR/ModuLLe"
 
 echo "================================================"
 echo "Disenchanted - KDE AI Chat Setup"
@@ -14,6 +15,32 @@ echo "================================================"
 # Check Python version
 PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
 echo "✓ Found Python $PYTHON_VERSION"
+
+# Check for git (needed to clone ModuLLe)
+if ! command -v git &> /dev/null; then
+    echo "✗ Error: git is not installed"
+    echo "Please install git first: sudo dnf install git"
+    exit 1
+fi
+
+# Clone ModuLLe library if not present
+if [ ! -d "$MODULLE_LIB" ]; then
+    echo ""
+    echo "ModuLLe library not found, cloning from GitHub..."
+    mkdir -p "$DEPS_DIR"
+
+    if git clone https://github.com/Alexthestampede/ModuLLe.git "$MODULLE_LIB"; then
+        echo "✓ ModuLLe cloned successfully"
+    else
+        echo "✗ Failed to clone ModuLLe"
+        echo "Please check your internet connection or clone manually:"
+        echo "  mkdir -p $DEPS_DIR"
+        echo "  git clone https://github.com/Alexthestampede/ModuLLe.git $MODULLE_LIB"
+        exit 1
+    fi
+else
+    echo "✓ ModuLLe library found at $MODULLE_LIB"
+fi
 
 # Create virtual environment
 if [ ! -d "$VENV_DIR" ]; then

@@ -21,12 +21,22 @@ See **[SETUP.md](SETUP.md)** for complete installation and usage instructions.
 ### Installation
 
 ```bash
-# Run the automated setup
+# Clone the repository
+git clone https://github.com/Alexthestampede/Disenchanted.git
+cd Disenchanted
+
+# Run the automated setup (automatically clones ModuLLe dependency)
 ./setup.sh
 
 # Test the GUI
 ./disenchanted-chat.sh
 ```
+
+The setup script will automatically:
+- Clone the [ModuLLe](https://github.com/Alexthestampede/ModuLLe) library dependency
+- Create a Python virtual environment
+- Install all required packages
+- Make launcher scripts executable
 
 ### Usage
 

@@ -37,22 +37,31 @@ sudo pacman -S python python-pip kdialog wl-clipboard xsel
 
 ## Installation
 
-### Step 1: Run Setup Script
-
-The setup script creates a virtual environment and installs all dependencies:
+### Step 1: Clone the Repository
 
 ```bash
-cd /home/alexthestampede/Aish/linuxintelligence/dev/ModuLLe
+git clone https://github.com/Alexthestampede/Disenchanted.git
+cd Disenchanted
+```
+
+### Step 2: Run Setup Script
+
+The setup script automatically handles all dependencies:
+
+```bash
 ./setup.sh
 ```
 
 This will:
+- Clone the [ModuLLe](https://github.com/Alexthestampede/ModuLLe) library (if not already present)
 - Create a Python virtual environment in `venv/`
 - Install PyQt5 and other GUI dependencies
-- Install ModuLLe library with all AI provider support
+- Install ModuLLe with all AI provider support
 - Make launcher scripts executable
 
-### Step 2: Test the GUI
+**Note**: The ModuLLe library will be cloned into `deps/ModuLLe/` automatically.
+
+### Step 3: Test the GUI
 
 Launch the chat interface manually to verify installation:
 
@@ -67,7 +76,7 @@ On first run:
 4. Click "🔌 Test Connection" to verify
 5. Click "Save"
 
-### Step 3: Configure KDE Global Shortcut
+### Step 4: Configure KDE Global Shortcut
 
 Now set up the keyboard shortcut to trigger the AI from anywhere:
 
