@@ -1,4 +1,4 @@
-"""ModuLLe GUI configuration"""
+"""Disenchanted GUI configuration"""
 from config.app_config import AppConfig
 
 __all__ = ['AppConfig']
