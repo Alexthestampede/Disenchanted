@@ -1,0 +1,11 @@
+# ModuLLe KDE GUI Requirements
+# Install in venv: pip install -r requirements.txt
+
+# Qt GUI framework
+PyQt5>=5.15.0
+
+# ModuLLe library (installed from deps/ModuLLe)
+# Install separately: pip install -e ../../deps/ModuLLe[all]
+
+# Optional: Rich text formatting in chat
+markdown2>=2.4.0
