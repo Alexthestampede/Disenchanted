@@ -76,7 +76,8 @@ class AppConfig:
             'api_key': None,
             'temperature': None,  # None = use server default
             'max_tokens': None,
-            'system_prompt': ''  # Empty = no system prompt
+            'system_prompt': '',  # Empty = no system prompt
+            'screenshot_prompt': 'Analyze this screenshot'
         }
 
     def reset_settings(self):

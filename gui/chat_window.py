@@ -246,7 +246,8 @@ class ChatBubble(QFrame):
 class DisenchantedChatWindow(QMainWindow):
     """Main chat window for Disenchanted"""
 
-    def __init__(self, initial_text: Optional[str] = None, initial_prompt: Optional[str] = None):
+    def __init__(self, initial_text: Optional[str] = None, initial_prompt: Optional[str] = None,
+                 initial_screenshot: Optional[str] = None):
         super().__init__()
 
         self.config = AppConfig()
@@ -272,6 +273,8 @@ class DisenchantedChatWindow(QMainWindow):
         # If initial text provided, add it to the conversation
         if initial_text and initial_prompt:
             self.start_conversation(initial_prompt, initial_text)
+        elif initial_screenshot:
+            self.start_screenshot_conversation(initial_screenshot)
 
     def init_ui(self):
         """Initialize the user interface"""
@@ -460,6 +463,55 @@ class DisenchantedChatWindow(QMainWindow):
             "role": "user",
             "content": initial_message
         })
+        self.process_ai_response()
+
+    def start_screenshot_conversation(self, screenshot_path: str):
+        """Start conversation by analyzing a screenshot"""
+        if not self.vision_processor:
+            QMessageBox.warning(self, "Vision Not Available",
+                              "No vision model configured.\n\n"
+                              "Go to Settings and configure a vision model to use screenshot analysis.")
+            return
+
+        # Verify screenshot file exists
+        if not Path(screenshot_path).is_file():
+            QMessageBox.warning(self, "Screenshot Not Found",
+                              f"Screenshot file not found:\n{screenshot_path}")
+            return
+
+        # Add system prompt if configured
+        settings = self.config.load_settings()
+        system_prompt = settings.get('system_prompt', '').strip()
+        if system_prompt:
+            self.conversation_history.append({
+                "role": "system",
+                "content": system_prompt
+            })
+
+        # Read and base64-encode the screenshot
+        try:
+            with open(screenshot_path, 'rb') as f:
+                image_bytes = f.read()
+                self.attached_image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+                self.attached_image_path = screenshot_path
+        except Exception as e:
+            QMessageBox.critical(self, "Screenshot Load Error",
+                               f"Failed to load screenshot:\n{str(e)}")
+            return
+
+        # Get the screenshot prompt from settings
+        prompt = settings.get('screenshot_prompt', 'Analyze this screenshot').strip()
+        if not prompt:
+            prompt = 'Analyze this screenshot'
+
+        # Add message to chat with screenshot thumbnail
+        self.add_message(prompt, is_user=True, image_path=screenshot_path)
+        self.conversation_history.append({
+            "role": "user",
+            "content": prompt
+        })
+
+        # Send to AI vision processor
         self.process_ai_response()
 
     def add_message(self, text: str, is_user: bool, image_path: Optional[str] = None):
@@ -737,12 +789,18 @@ def main(initial_text: Optional[str] = None, initial_prompt: Optional[str] = Non
     app = QApplication(sys.argv)
     app.setApplicationName("Disenchanted")
 
+    initial_screenshot = None
+
     # Check for KDE launcher environment variables
     if '--from-kde' in sys.argv:
         initial_text = os.environ.get('DISENCHANTED_INITIAL_TEXT')
         initial_prompt = os.environ.get('DISENCHANTED_INITIAL_PROMPT')
 
-    window = DisenchantedChatWindow(initial_text, initial_prompt)
+    # Check for screenshot mode
+    if '--from-screenshot' in sys.argv:
+        initial_screenshot = os.environ.get('DISENCHANTED_INITIAL_SCREENSHOT')
+
+    window = DisenchantedChatWindow(initial_text, initial_prompt, initial_screenshot)
     window.show()
 
     sys.exit(app.exec_())

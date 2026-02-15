@@ -234,6 +234,29 @@ class SettingsDialog(QDialog):
         system_group.setLayout(system_layout)
         params_layout.addWidget(system_group)
 
+        # Screenshot settings group
+        screenshot_group = QGroupBox("Screenshot Settings")
+        screenshot_layout = QVBoxLayout()
+
+        screenshot_help = QLabel(
+            "Prompt sent automatically when using the screenshot shortcut. "
+            "Write detailed instructions for analyzing screenshots (e.g., radar screens, game HUDs)."
+        )
+        screenshot_help.setStyleSheet("color: #888; font-size: 9pt; font-style: italic;")
+        screenshot_help.setWordWrap(True)
+        screenshot_layout.addWidget(screenshot_help)
+
+        self.screenshot_prompt_input = QTextEdit()
+        self.screenshot_prompt_input.setPlaceholderText(
+            "Example: Analyze this velocity radar screen and describe any notable weather patterns, "
+            "rotation signatures, or severe weather indicators you can identify."
+        )
+        self.screenshot_prompt_input.setMaximumHeight(100)
+        screenshot_layout.addWidget(self.screenshot_prompt_input)
+
+        screenshot_group.setLayout(screenshot_layout)
+        params_layout.addWidget(screenshot_group)
+
         params_layout.addStretch()
         tabs.addTab(params_tab, "Parameters")
 
@@ -336,6 +359,10 @@ class SettingsDialog(QDialog):
         # Set system prompt
         system_prompt = self.current_settings.get('system_prompt', '')
         self.system_prompt_input.setPlainText(system_prompt)
+
+        # Set screenshot prompt
+        screenshot_prompt = self.current_settings.get('screenshot_prompt', 'Analyze this screenshot')
+        self.screenshot_prompt_input.setPlainText(screenshot_prompt)
 
         # Update UI based on provider
         self.on_provider_changed()
@@ -536,7 +563,8 @@ class SettingsDialog(QDialog):
                 'api_key': self.api_key_input.text().strip() or None,
                 'temperature': temperature,
                 'max_tokens': max_tokens,
-                'system_prompt': self.system_prompt_input.toPlainText().strip()
+                'system_prompt': self.system_prompt_input.toPlainText().strip(),
+                'screenshot_prompt': self.screenshot_prompt_input.toPlainText().strip() or 'Analyze this screenshot'
             }
 
             self.config.save_settings(settings)
