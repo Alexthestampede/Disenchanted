@@ -7,6 +7,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="$SCRIPT_DIR/venv"
 DEPS_DIR="$SCRIPT_DIR/deps"
 MODULLE_LIB="$DEPS_DIR/ModuLLe"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REPO_LIB="$REPO_ROOT/deps/ModuLLe"
 
 echo "================================================"
 echo "Disenchanted - KDE AI Chat Setup"
@@ -23,8 +25,13 @@ if ! command -v git &> /dev/null; then
     exit 1
 fi
 
-# Clone ModuLLe library if not present
-if [ ! -d "$MODULLE_LIB" ]; then
+# Locate ModuLLe library: reuse the repo-level checkout if present, else clone
+if [ -d "$REPO_LIB" ]; then
+    echo "✓ ModuLLe library found at $REPO_LIB (repo-level checkout, reusing)"
+    MODULLE_LIB="$REPO_LIB"
+elif [ -d "$MODULLE_LIB" ]; then
+    echo "✓ ModuLLe library found at $MODULLE_LIB"
+else
     echo ""
     echo "ModuLLe library not found, cloning from GitHub..."
     mkdir -p "$DEPS_DIR"
@@ -38,8 +45,6 @@ if [ ! -d "$MODULLE_LIB" ]; then
         echo "  git clone https://github.com/Alexthestampede/ModuLLe.git $MODULLE_LIB"
         exit 1
     fi
-else
-    echo "✓ ModuLLe library found at $MODULLE_LIB"
 fi
 
 # Create virtual environment

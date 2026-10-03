@@ -90,7 +90,7 @@ Now set up the keyboard shortcut to trigger the AI from anywhere:
 6. In the **Action** tab:
    - Set **Command/URL** to the full path:
      ```
-     /home/alexthestampede/Aish/linuxintelligence/dev/ModuLLe/disenchanted-wrapper.sh
+     /home/alexthestampede/Aish/Disenchanted/dev/ModuLLe/disenchanted-wrapper.sh
      ```
 7. Click **Apply**
 
@@ -109,7 +109,7 @@ Now set up the keyboard shortcut to trigger the AI from anywhere:
 Launch the GUI directly:
 
 ```bash
-cd /home/alexthestampede/Aish/linuxintelligence/dev/ModuLLe
+cd /home/alexthestampede/Aish/Disenchanted/dev/ModuLLe
 ./disenchanted-chat.sh
 ```
 
@@ -237,7 +237,7 @@ python3 gui/chat_window.py
 To update Disenchanted library:
 
 ```bash
-cd /home/alexthestampede/Aish/linuxintelligence/dev/ModuLLe
+cd /home/alexthestampede/Aish/Disenchanted/dev/ModuLLe
 source venv/bin/activate
 pip install -e ../../deps/ModuLLe[all] --upgrade
 ```
@@ -252,7 +252,7 @@ pip install -r requirements.txt --upgrade
 ## Uninstallation
 
 ```bash
-cd /home/alexthestampede/Aish/linuxintelligence/dev/ModuLLe
+cd /home/alexthestampede/Aish/Disenchanted/dev/ModuLLe
 
 # Remove virtual environment
 rm -rf venv/
