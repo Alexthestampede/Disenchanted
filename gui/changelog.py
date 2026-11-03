@@ -4,6 +4,16 @@
 CHANGELOG = """Disenchanted — Changelog
 ========================
 
+20261103.1
+----------
+- Read-aloud (text-to-speech): click 🔊 on any assistant message to hear it,
+  or enable "Read assistant replies automatically" in Settings → Speech.
+  Playback continues through paplay/pw-play/ffplay/aplay; click ⏹ to stop.
+- Speech uses Ollama's /v1/audio/speech (Ollama >= 0.40.9) with a
+  speech-capable model such as lfm3-omni. Pick the model and voice in
+  Settings → Speech; "List voices" queries the model's voices.
+- Bundled ModuLLe updated to 20261103.1 (speech support, web fetcher fix).
+
 20261003.1
 ----------
 - Date-based versioning (yyyymmdd.v) shown in the window title and Settings → About.

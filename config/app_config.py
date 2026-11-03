@@ -5,7 +5,7 @@ Handles loading and saving settings for the KDE GUI application
 
 Config is a nested dict persisted to ~/.disenchanted.json. Top-level keys
 are the legacy flat provider settings; feature settings live under
-namespaced keys (tasks, compression, searxng, mcp, hrr, dtline, ui).
+namespaced keys (tasks, compression, searxng, mcp, hrr, dtline, speech, ui).
 Unknown keys in the file are preserved on save (merge-on-write).
 """
 import json
@@ -162,6 +162,15 @@ class AppConfig:
                 'steps': None,
                 'seed': None,
                 'output_dir': None,   # None = dtline default
+            },
+
+            # -- speech (text-to-speech via Ollama /v1/audio/speech) --
+            'speech': {
+                'enabled': False,
+                'auto_speak': False,   # read every assistant reply aloud
+                'model': None,         # None = library default (lfm3-omni)
+                'voice': None,         # None = the model's own voice
+                'base_url': None,      # None = Ollama URL from the Provider tab
             },
 
             # -- timestamps / time injection --

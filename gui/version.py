@@ -7,7 +7,7 @@ Versions use a date-based scheme: yyyymmdd.v, e.g. 20261003.1
 - .v: bump counter for multiple releases on the same day (starting at 1)
 """
 
-VERSION = "20261003.1"
+VERSION = "20261103.1"
 
 APP_NAME = "Disenchanted"
 GITHUB_REPO = "Alexthestampede/Disenchanted"

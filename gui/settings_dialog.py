@@ -13,6 +13,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal
 
 from modulle import create_ai_client
 from gui.system_prompts import SystemPromptStore
+from gui.speech import SpeechManager, VoiceListWorker, create_processor
 
 
 class ModelFetcherThread(QThread):
@@ -504,6 +505,64 @@ class SettingsDialog(QDialog):
         dt_layout.addStretch()
         self.tabs.addTab(dt_tab, "Image Gen")
 
+        # ================= Speech (text-to-speech) tab =================
+        spch_tab = QWidget()
+        spch_layout = QVBoxLayout(spch_tab)
+
+        spch_group = QGroupBox("Read aloud (Ollama /v1/audio/speech)")
+        spch_form = QFormLayout()
+
+        self.speech_enable = QCheckBox("Enable read-aloud")
+        spch_form.addRow(self.speech_enable)
+
+        self.speech_auto = QCheckBox("Read assistant replies automatically")
+        spch_form.addRow(self.speech_auto)
+
+        self.speech_model = QComboBox()
+        self.speech_model.setEditable(True)
+        self.speech_model.setPlaceholderText("lfm3-omni")
+        spch_form.addRow("Speech model:", self.speech_model)
+
+        self.speech_voice = QComboBox()
+        self.speech_voice.setEditable(True)
+        self.speech_voice.setPlaceholderText("default")
+        spch_form.addRow("Voice:", self.speech_voice)
+
+        self.speech_base_url = QLineEdit()
+        self.speech_base_url.setPlaceholderText(
+            "(same as the Ollama URL on the Provider tab)")
+        spch_form.addRow("Ollama URL:", self.speech_base_url)
+
+        spch_btn_row = QHBoxLayout()
+        self.speech_voices_btn = QPushButton("🔄 List voices")
+        self.speech_voices_btn.clicked.connect(self.speech_refresh_voices)
+        spch_btn_row.addWidget(self.speech_voices_btn)
+        self.speech_test_btn = QPushButton("▶ Test voice")
+        self.speech_test_btn.clicked.connect(self.speech_test)
+        spch_btn_row.addWidget(self.speech_test_btn)
+        spch_btn_row.addStretch()
+        spch_form.addRow("", spch_btn_row)
+
+        spch_group.setLayout(spch_form)
+        spch_layout.addWidget(spch_group)
+
+        self.speech_status_label = QLabel("")
+        self.speech_status_label.setWordWrap(True)
+        self.speech_status_label.setStyleSheet(
+            "color: #888; font-size: 9pt; font-style: italic;")
+        spch_layout.addWidget(self.speech_status_label)
+
+        spch_note = QLabel(
+            "Needs Ollama >= 0.40.9 and a speech-capable model (lfm3-omni). "
+            "Speech models only speak — they cannot chat, so this model is "
+            "used for audio only. Click 🔊 on any assistant message to read "
+            "it aloud.")
+        spch_note.setWordWrap(True)
+        spch_note.setStyleSheet("color: #888; font-size: 9pt; font-style: italic;")
+        spch_layout.addWidget(spch_note)
+        spch_layout.addStretch()
+        self.tabs.addTab(spch_tab, "Speech")
+
         # ================= System prompts tab =================
         sp_tab = QWidget()
         sp_layout = QVBoxLayout(sp_tab)
@@ -717,9 +776,18 @@ class SettingsDialog(QDialog):
         self.dt_steps.setText(str(dt.get('steps')) if dt.get('steps') else '')
         self.dt_output.setText(dt.get('output_dir') or '')
 
+        # Speech tab
+        spch = self.current_settings.get('speech', {})
+        self.speech_enable.setChecked(spch.get('enabled', False))
+        self.speech_auto.setChecked(spch.get('auto_speak', False))
+        if spch.get('model'):
+            self.speech_model.setCurrentText(spch['model'])
+        if spch.get('voice'):
+            self.speech_voice.setCurrentText(spch['voice'])
+        self.speech_base_url.setText(spch.get('base_url') or '')
+
         # Prompts tab
         self.refresh_sp_list()
-
         # Update UI based on provider
         self.on_provider_changed()
 
@@ -1004,6 +1072,15 @@ class SettingsDialog(QDialog):
                 'output_dir': self.dt_output.text().strip() or None,
             }
 
+            # Speech (read-aloud)
+            settings['speech'] = {
+                'enabled': self.speech_enable.isChecked(),
+                'auto_speak': self.speech_auto.isChecked(),
+                'model': self.speech_model.currentText().strip() or None,
+                'voice': self.speech_voice.currentText().strip() or None,
+                'base_url': self.speech_base_url.text().strip() or None,
+            }
+
             self.config.save_settings(settings)
             QMessageBox.information(self, "Settings Saved",
                                   "Settings have been saved successfully!")
@@ -1018,6 +1095,90 @@ class SettingsDialog(QDialog):
         """Restore the built-in compression prompt (empty = default on save)."""
         from modulle.context import DEFAULT_COMPRESSION_PROMPT
         self.compression_prompt_input.setPlainText(DEFAULT_COMPRESSION_PROMPT)
+
+    # ------------------------------------------------------------- speech tab --
+    def _speech_processor(self):
+        """Processor built from the Speech tab fields (before saving).
+
+        Raises RuntimeError with a user-facing message when it cannot be built,
+        e.g. when the main provider is not Ollama.
+        """
+        provider = self.provider_combo.currentData()
+        if provider != 'ollama':
+            raise RuntimeError(
+                "Read-aloud requires the Ollama provider — speech runs through "
+                f"Ollama's /v1/audio/speech, not '{provider}'.")
+        return create_processor(
+            model=self.speech_model.currentText().strip() or None,
+            base_url=(self.speech_base_url.text().strip()
+                      or self.base_url_input.text().strip() or None))
+
+    def speech_refresh_voices(self):
+        """Ask the speech model which voices it supports (background)."""
+        try:
+            processor = self._speech_processor()
+        except Exception as e:
+            self.speech_status_label.setText(f"⚠ {e}")
+            return
+        self.speech_status_label.setText("Loading voices...")
+        self.speech_voices_btn.setEnabled(False)
+        thread = VoiceListWorker(processor, self)
+        thread.done.connect(self._on_voices_loaded)
+        thread.error.connect(self._on_voices_error)
+        thread.finished.connect(thread.deleteLater)
+        self._voices_thread = thread
+        thread.start()
+
+    def _on_voices_loaded(self, voices: List[str]):
+        self.speech_voices_btn.setEnabled(True)
+        current = self.speech_voice.currentText()
+        self.speech_voice.clear()
+        for voice in voices:
+            self.speech_voice.addItem(voice)
+        self.speech_voice.setCurrentText(current or 'default')
+        self.speech_status_label.setText(
+            f"{len(voices)} voices available" if voices
+            else "The model reported no voices (it may not be speech-capable)")
+
+    def _on_voices_error(self, message: str):
+        self.speech_voices_btn.setEnabled(True)
+        self.speech_status_label.setText(f"⚠ {message}")
+
+    def speech_test(self):
+        """Speak a sample sentence with the current (unsaved) settings."""
+        try:
+            processor = self._speech_processor()
+        except Exception as e:
+            self.speech_status_label.setText(f"⚠ {e}")
+            return
+        manager = SpeechManager(self)
+        manager.configure({'enabled': True,
+                           'voice': self.speech_voice.currentText().strip() or None},
+                          provider='ollama', processor=processor)
+        manager.error.connect(
+            lambda msg: self.speech_status_label.setText(f"⚠ {msg}"))
+        manager.finished.connect(
+            lambda: self.speech_status_label.setText("Done."))
+        if not manager.speak("Hello! This is how Disenchanted sounds."):
+            self.speech_status_label.setText("⚠ Could not start playback")
+            return
+        self._test_speech = manager
+        self.speech_status_label.setText("Speaking test sentence...")
+
+    def done(self, result: int):
+        """Stop any preview audio when the dialog closes (accept or cancel)."""
+        manager = getattr(self, '_test_speech', None)
+        if manager is not None:
+            try:
+                manager.stop()
+            except Exception:
+                pass
+            self._test_speech = None
+        voices = getattr(self, '_voices_thread', None)
+        if voices is not None and voices.isRunning():
+            voices.terminate()
+            voices.wait(500)
+        super().done(result)
 
 
     # -- SearXNG --------------------------------------------------------------

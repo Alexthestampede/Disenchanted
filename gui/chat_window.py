@@ -44,6 +44,7 @@ from modulle.memory import HRRMemoryStore
 from gui.settings_dialog import SettingsDialog
 from gui.version import VERSION, APP_NAME
 from gui.bubbles import ChatBubble
+from gui.speech import SpeechManager
 from gui.workers import AIWorkerThread, SimpleTaskThread
 from gui.session import (
     ConversationSession, list_sessions, load_session, sessions_dir,
@@ -93,6 +94,13 @@ class DisenchantedChatWindow(QMainWindow):
         # System prompts DB
         self.prompt_store = SystemPromptStore()
 
+        # Speech (text-to-speech); configured by init_speech() after init_ai()
+        self.speech = SpeechManager(self)
+        self.speech.error.connect(self._on_speech_error)
+        self.speech.error.connect(self._clear_speaking_bubble)
+        self.speech.finished.connect(self._clear_speaking_bubble)
+        self._speaking_bubble: Optional[ChatBubble] = None
+
         # Update checker
         self.update_checker = UpdateChecker(self.config, VERSION)
 
@@ -100,6 +108,7 @@ class DisenchantedChatWindow(QMainWindow):
         self.init_web_components()
         self.init_ai()
         self.init_memory()
+        self.init_speech()
 
         # Update check (once/day, silent unless update found)
         self.update_checker.check_soon(self)
@@ -499,6 +508,53 @@ class DisenchantedChatWindow(QMainWindow):
         except Exception as e:
             print(f"Warning: HRR memory init failed: {e}")
             self.memory = None
+
+    # ---------------------------------------------------------------- speech --
+    def init_speech(self):
+        """(Re)configure read-aloud from the current settings."""
+        settings = self.config.load_settings()
+        error = self.speech.configure(
+            self.config.get_section('speech'),
+            provider=settings.get('provider', 'ollama'),
+            base_url=settings.get('base_url'),
+            api_key=settings.get('api_key'),
+        )
+        if error:
+            print(f"Read-aloud unavailable: {error}")
+        # stop anything still playing from the previous configuration
+        self._clear_speaking_bubble()
+
+    def _speech_enabled(self) -> bool:
+        return bool(self.speech and self.speech.enabled())
+
+    def _toggle_speak(self, text: str, bubble: ChatBubble):
+        """Read a message aloud, or stop if that message is already playing."""
+        if bubble is self._speaking_bubble:
+            self.speech.stop()
+            self._clear_speaking_bubble()
+            return
+        self._clear_speaking_bubble()
+        if not self.speech.speak(text):
+            return
+        self._speaking_bubble = bubble
+        bubble.set_speaking(True)
+
+    def _on_speech_error(self, message: str):
+        self.status_label.setText(f"🔇 {message}")
+        self.status_label.setStyleSheet("color: #da4453;")
+        QTimer.singleShot(6000, self._restore_status_after_speech)
+
+    def _restore_status_after_speech(self):
+        if not (self.worker_thread and self.worker_thread.isRunning()):
+            self._set_ready_status()
+
+    def _clear_speaking_bubble(self):
+        bubble, self._speaking_bubble = self._speaking_bubble, None
+        if bubble is not None:
+            try:
+                bubble.set_speaking(False)
+            except RuntimeError:   # bubble already destroyed
+                pass
 
     # ------------------------------------------------------------- compression --
     @staticmethod
@@ -921,8 +977,13 @@ class DisenchantedChatWindow(QMainWindow):
         now_ts = __import__('time').time()
         show_ts = self.config.get_section('timestamps').get('show_on_bubbles', True)
         self.session.add_message('assistant', response)
-        self.add_bubble(response, is_user=False, timestamp=now_ts,
-                        show_timestamp=show_ts)
+        bubble = self.add_bubble(response, is_user=False, timestamp=now_ts,
+                                 show_timestamp=show_ts)
+
+        # Read the reply aloud when the user asked for it
+        if self._speech_enabled() and \
+                self.config.get_section('speech').get('auto_speak', False):
+            self._toggle_speak(response, bubble)
 
         # Clear attached files/image after successful response
         self.clear_attached_image()
@@ -1010,12 +1071,16 @@ class DisenchantedChatWindow(QMainWindow):
                    timestamp: Optional[float] = None,
                    show_timestamp: bool = True,
                    record: bool = False):
-        """Add a message bubble to the chat"""
+        """Add a message bubble to the chat (returns it for later updates)."""
         bubble = ChatBubble(text, is_user, image_path=image_path,
-                            timestamp=timestamp, show_timestamp=show_timestamp)
+                            timestamp=timestamp, show_timestamp=show_timestamp,
+                            speakable=self._speech_enabled())
+        bubble.speak_requested.connect(
+            lambda _text, b=bubble, t=text: self._toggle_speak(t, b))
         # Insert before the stretch
         self.chat_layout.insertWidget(self.chat_layout.count() - 1, bubble)
         QTimer.singleShot(100, self.scroll_to_bottom)
+        return bubble
 
     def scroll_to_bottom(self):
         scrollbar = self.chat_scroll.verticalScrollBar()
@@ -1106,9 +1171,15 @@ class DisenchantedChatWindow(QMainWindow):
             self.init_ai()
             self.init_memory()
             self.init_web_components()
+            self.init_speech()
 
     def closeEvent(self, event):
         self._autosave_current()
+        try:
+            self.speech.stop()
+        except Exception:
+            pass
+        self._clear_speaking_bubble()
         try:
             if getattr(self, 'mcp_manager', None):
                 self.mcp_manager.close_all()
